@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>黄鹤楼 3D 展示</title>
+    
+    <!-- ✅ 使用 jsDelivr CDN（GitHub友好，国内访问更稳定） -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.3.0/dist/model-viewer.min.js"></script>
+    
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+        }
+        model-viewer { 
+            width: 100vw; 
+            height: 100vh; 
+            background-color: #f5f5f5; 
+        }
+        
+        /* 数据面板样式 */
+        .data-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 250, 240, 0.98);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            width: 300px;
+            z-index: 100;
+            border: 2px solid #d4a574;
+        }
+        
+        .panel-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #8b4513;
+            margin-bottom: 15px;
+            text-align: center;
+            border-bottom: 2px solid #d4a574;
+            padding-bottom: 10px;
+        }
+        
+        .data-item { 
+            margin-bottom: 10px; 
+            font-size: 14px; 
+            color: #333; 
+            display: flex;
+            justify-content: space-between;
+        }
+        .data-label { color: #666; }
+        .data-value { 
+            font-weight: bold; 
+            color: #8b4513; 
+        }
+        
+        /* 📝 内容展示区域 */
+        .content-display {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(212, 165, 116, 0.1);
+            border-radius: 8px;
+            border-left: 4px solid #d4a574;
+            min-height: 100px;
+        }
+        .content-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #8b4513;
+            margin-bottom: 8px;
+        }
+        .content-text {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        /* 🎯 快捷切换按钮组 */
+        .quick-switch {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .switch-btn {
+            flex: 1;
+            min-width: 60px;
+            padding: 8px 12px;
+            background: #d4a574;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        .switch-btn:hover {
+            background: #8b4513;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .switch-btn.active {
+            background: #8b4513;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        /* 热点样式 */
+        .hotspot {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            background: #c41e3a;
+            border-radius: 50%;
+            border: 3px solid #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            animation: pulse 2s infinite;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .hotspot::after {
+            content: attr(data-label);
+            position: absolute;
+            top: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .hotspot:hover::after { opacity: 1; }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(196, 30, 58, 0.7); }
+            70% { transform: scale(1.15); box-shadow: 0 0 0 15px rgba(196, 30, 58, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(196, 30, 58, 0); }
+        }
+        
+        /* ⬇️ 底部导航栏 */
+        .bottom-nav {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 250, 240, 0.95);
+            padding: 15px 25px;
+            border-radius: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+            border: 2px solid #d4a574;
+        }
+        .nav-item {
+            padding: 10px 20px;
+            background: transparent;
+            border: 2px solid #d4a574;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            color: #8b4513;
+            transition: all 0.3s;
+        }
+        .nav-item:hover {
+            background: #d4a574;
+            color: white;
+            transform: translateY(-2px);
+        }
+        .nav-item.active {
+            background: #8b4513;
+            border-color: #8b4513;
+            color: white;
+        }
+        
+        /* 加载提示 */
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            color: #666;
+            z-index: 50;
+            text-align: center;
+            padding: 20px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 12px;
+        }
+        
+        /* 提示动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .content-display {
+            animation: fadeIn 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ✅ 关键修改：使用相对路径 + base-url 兼容 -->
+    <model-viewer 
+        id="ar-viewer"
+        src="./assets/model.glb" 
+        ios-src="https://cdn.jsdelivr.net/gh/google/model-viewer@v3.3.0/packages/shared-assets/models/Astronaut.usdz"
+        alt="黄鹤楼 3D 模型"
+        ar
+        ar-modes="webxr scene-viewer quick-look"
+        camera-controls
+        touch-action="pan-y"
+        shadow-intensity="1"
+        exposure="1"
+        environment-image="neutral"
+        poster="./assets/poster.webp"
+        loading="eager"
+        auto-rotate
+        camera-orbit="0deg 75deg 105deg"
+        reveal="auto">
+
+        <!-- ✅ 热点位置可根据实际模型调整 -->
+        <button slot="hotspot-height" data-position="0 25 0" data-normal="0 0 1" 
+                class="hotspot" data-label="📏 高度" aria-label="查看建筑高度">📏</button>
+        <button slot="hotspot-history" data-position="0 5 0" data-normal="0 0 1" 
+                class="hotspot" data-label="📜 历史" aria-label="查看历史">📜</button>
+        <button slot="hotspot-culture" data-position="-2 15 1" data-normal="0 0 1" 
+                class="hotspot" data-label="✍️ 诗词" aria-label="查看诗词">✍️</button>
+        <button slot="hotspot-structure" data-position="2 10 1" data-normal="0 0 1" 
+                class="hotspot" data-label="🏗️ 结构" aria-label="查看建筑">🏗️</button>
+        
+    </model-viewer>
+
+    <div class="loading" id="loading-tip">
+        🏯 黄鹤楼加载中...<br>
+        <small style="color:#999">首次加载可能需要10-30秒</small>
+    </div>
+
+    <!-- 🏯 数据面板 -->
+    <div class="data-panel">
+        <div class="panel-title">🏯 黄鹤楼</div>
+        
+        <div class="data-item">
+            <span class="data-label">📍 位置</span>
+            <span class="data-value">武汉·蛇山</span>
+        </div>
+        <div class="data-item">
+            <span class="data-label">📐 高度</span>
+            <span class="data-value">51.4 米</span>
+        </div>
+        <div class="data-item">
+            <span class="data-label">🧱 层数</span>
+            <span class="data-value">外5层/内9层</span>
+        </div>
+        <div class="data-item">
+            <span class="data-label">🏗️ 始建</span>
+            <span class="data-value">公元223年</span>
+        </div>
+        
+        <!-- 📝 内容展示区 -->
+        <div class="content-display" id="content-display">
+            <div class="content-title" id="content-title">✨ 欢迎探索</div>
+            <div class="content-text" id="content-text">
+                点击右侧按钮或模型上的热点，查看黄鹤楼的详细信息
+            </div>
+        </div>
+        
+        <!-- 🎯 快捷切换按钮 -->
+        <div class="quick-switch">
+            <button class="switch-btn active" data-key="intro">🏠 简介</button>
+            <button class="switch-btn" data-key="height">📏 高度</button>
+            <button class="switch-btn" data-key="history">📜 历史</button>
+            <button class="switch-btn" data-key="culture">✍️ 诗词</button>
+            <button class="switch-btn" data-key="structure">🏗️ 结构</button>
+        </div>
+    </div>
+
+    <!-- ⬇️ 底部导航栏 -->
+    <div class="bottom-nav">
+        <button class="nav-item active" data-key="intro">简介</button>
+        <button class="nav-item" data-key="height">高度</button>
+        <button class="nav-item" data-key="history">历史</button>
+        <button class="nav-item" data-key="culture">诗词</button>
+        <button class="nav-item" data-key="structure">结构</button>
+    </div>
+
+    <script>
+        // ✅ GitHub Pages 路径兼容：自动获取基础路径
+        const basePath = window.location.pathname.includes('/<repository-name>/') 
+            ? '/<repository-name>/' 
+            : './';
+        
+        const modelViewer = document.querySelector('#ar-viewer');
+        const loadingTip = document.getElementById('loading-tip');
+        const contentTitle = document.getElementById('content-title');
+        const contentText = document.getElementById('content-text');
+        
+        // 📚 黄鹤楼知识库
+        const yellowCraneTowerData = {
+            intro: {
+                title: "🏯 天下江山第一楼",
+                text: "黄鹤楼位于湖北省武汉市长江南岸的武昌蛇山之巅，与湖南岳阳楼、江西滕王阁并称为'江南三大名楼'。享有'天下绝景'的盛誉。",
+                camera: "0deg 75deg 105deg"
+            },
+            height: {
+                title: "📏 建筑高度",
+                text: "黄鹤楼总高51.4米，其中主楼高49米，加铜顶共51.4米。楼分五层，飞檐翘角，层层叠叠，气势恢宏，是武汉的标志性建筑。",
+                camera: "0deg 45deg 80deg"
+            },
+            history: {
+                title: "📜 历史沿革",
+                text: "始建于三国吴黄武二年(223年)，历史上屡毁屡建达27次。现存建筑为1985年以清代'同治楼'为蓝本重建，采用现代钢筋混凝土结构，既保留古韵又坚固耐用。",
+                camera: "180deg 75deg 105deg"
+            },
+            culture: {
+                title: "✍️ 诗词文化",
+                text: "崔颢《黄鹤楼》'昔人已乘黄鹤去，此地空余黄鹤楼'、李白《送孟浩然之广陵》'故人西辞黄鹤楼，烟花三月下扬州'，使其成为中华诗楼。",
+                camera: "-30deg 60deg 90deg"
+            },
+            structure: {
+                title: "🏗️ 建筑特色",
+                text: "攒尖顶，飞檐5层，72根圆柱拔地而起，60个翘角凌空舒展，屋面覆盖10多万块黄色琉璃瓦。层层飞檐形似黄鹤展翅，极具楚文化特色。",
+                camera: "90deg 75deg 100deg"
+            }
+        };
+
+        // ✅ 监听模型加载成功
+        modelViewer.addEventListener('load', () => {
+            loadingTip.style.display = 'none';
+            showContent('intro');
+        });
+        
+        // ✅ 监听加载进度（可选：显示进度条）
+        modelViewer.addEventListener('progress', (event) => {
+            const percent = Math.round(event.detail.totalProgress * 100);
+            loadingTip.innerHTML = `🏯 加载中... ${percent}%`;
+        });
+        
+        // ✅ 错误处理
+        modelViewer.addEventListener('error', (e) => {
+            console.error('模型加载错误:', e);
+            loadingTip.innerHTML = `❌ 加载失败<br><small style="color:#c41e3a">请检查：<br>1. assets/model.glb 是否存在<br>2. 文件大小是否超过100MB<br>3. 仓库是否启用 GitHub Pages</small>`;
+            loadingTip.style.color = '#c41e3a';
+        });
+
+        // 🎯 显示内容函数
+        function showContent(key) {
+            const data = yellowCraneTowerData[key];
+            if (!data) return;
+            
+            contentTitle.textContent = data.title;
+            contentText.textContent = data.text;
+            
+            // 平滑过渡相机角度
+            if (data.camera) {
+                modelViewer.setAttribute('camera-orbit', data.camera);
+            }
+            
+            // 更新按钮状态
+            document.querySelectorAll('.switch-btn, .nav-item').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.key === key);
+            });
+        }
+
+        // 🎮 快捷按钮点击事件
+        document.querySelectorAll('.switch-btn, .nav-item').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.key;
+                showContent(key);
+            });
+        });
+
+        // 🎯 热点点击交互
+        modelViewer.addEventListener('click', (event) => {
+            if (!event.target.classList.contains('hotspot')) return;
+            
+            const slot = event.target.getAttribute('slot');
+            const keyMap = {
+                'hotspot-height': 'height',
+                'hotspot-history': 'history',
+                'hotspot-culture': 'culture',
+                'hotspot-structure': 'structure'
+            };
+            
+            const key = keyMap[slot];
+            if (key) showContent(key);
+            
+            // 移动端震动反馈
+            if (navigator.vibrate) navigator.vibrate(30);
+        });
+
+        // ⌨️ 键盘快捷键支持
+        document.addEventListener('keydown', (e) => {
+            const keyMap = {
+                '1': 'intro', '2': 'height', '3': 'history',
+                '4': 'culture', '5': 'structure'
+            };
+            if (keyMap[e.key]) {
+                showContent(keyMap[e.key]);
+                e.preventDefault();
+            }
+        });
+
+        // 📱 移动端触摸优化
+        document.addEventListener('touchstart', () => {}, { passive: true });
+
+    </script>
+</body>
+</html>
